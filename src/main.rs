@@ -37,6 +37,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let block = map.get_block(ivec3(0, 0, 0))?;
+    let node = block.get_node(ivec3(0, 0, 0));
+    let name = block.get_name_by_id(node.id).unwrap();
+
+    println!("{name}");
 
     Ok(())
 }
