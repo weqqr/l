@@ -4,6 +4,7 @@
 use std::{error::Error, path::PathBuf};
 
 use glam::{Vec3, vec3};
+use winit::dpi::PhysicalSize;
 use winit::event::{DeviceEvent, DeviceId};
 use winit::event_loop::ControlFlow;
 use winit::keyboard::{KeyCode, PhysicalKey};
@@ -45,7 +46,9 @@ impl App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let window_attributes = Window::default_attributes().with_title("Light");
+        let window_attributes = Window::default_attributes()
+            .with_title("Light")
+            .with_inner_size(PhysicalSize::new(1280, 720));
         let window = event_loop.create_window(window_attributes).unwrap();
         let renderer = Renderer::new(window);
         let adapter_info = renderer.adapter_info();

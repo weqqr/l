@@ -13,6 +13,7 @@ struct Uniforms {
     forward: vec3f,
     fov: f32,
     position: vec3f,
+    aspect_ratio: f32,
 };
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -33,7 +34,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
     let sphere_center = vec3(0.0, 0.0, -5.0);
     let sphere_radius = 1.0;
 
-    let dir = get_ray_dir(1.0, in.texcoord);
+    let dir = get_ray_dir(uniforms.aspect_ratio, in.texcoord);
 
     let t = intersect_sphere(origin, dir, sphere_center, sphere_radius);
 

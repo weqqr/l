@@ -23,7 +23,7 @@ struct ShaderUniforms {
     forward: Vec3,
     fov: f32,
     position: Vec3,
-    _pad: f32,
+    aspect_ratio: f32,
 }
 
 pub struct Renderer {
@@ -245,11 +245,14 @@ impl Renderer {
         let (forward, _) = camera.forward_right();
         let fov = camera.fov.to_radians();
 
+        let inner_size = self.window.inner_size();
+        let aspect_ratio = inner_size.width as f32 / inner_size.height as f32;
+
         let uniforms = ShaderUniforms {
             forward,
             fov,
             position: camera.position,
-            _pad: 0.0,
+            aspect_ratio,
         };
 
         self.queue.write_buffer(
