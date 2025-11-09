@@ -28,7 +28,7 @@ impl MapBackend for SqliteBackend {
 
         let data = self
             .conn
-            .query_one(SQL, &[&pos.x, &pos.y, &pos.z], |row| row.get(0))?;
+            .query_one(SQL, [&pos.x, &pos.y, &pos.z], |row| row.get(0))?;
 
         Ok(data)
     }

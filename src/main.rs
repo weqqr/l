@@ -30,6 +30,12 @@ impl ApplicationHandler for App {
         let window_attributes = Window::default_attributes().with_title("Light");
         let window = event_loop.create_window(window_attributes).unwrap();
         let renderer = Renderer::new(window);
+        let adapter_info = renderer.adapter_info();
+
+        renderer.window().set_title(&format!(
+            "Light ({} on {})",
+            adapter_info.backend, adapter_info.name
+        ));
 
         self.renderer = Some(renderer)
     }
