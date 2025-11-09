@@ -1,3 +1,4 @@
+use glam::{vec2, vec3};
 use pollster::FutureExt;
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::{
@@ -11,7 +12,7 @@ use wgpu::{
 use wgpu::{AdapterInfo, CommandEncoderDescriptor, TextureViewDescriptor};
 use winit::{dpi::PhysicalSize, window::Window};
 
-use crate::asset::Mesh;
+use crate::asset::{Mesh, Vertex};
 
 pub struct Renderer {
     surface: Surface<'static>,
@@ -21,6 +22,7 @@ pub struct Renderer {
     queue: Queue,
 
     render_pipeline: RenderPipeline,
+    fullscreen_triangle: MeshBuffer,
 
     window: Window,
 }
@@ -104,6 +106,36 @@ impl Renderer {
             cache: None,
         });
 
+        let mut mesh = Mesh::new();
+        mesh.add_vertex(Vertex {
+            position: vec3(-1.0, 3.0, 0.0),
+            normal: vec3(0.0, 0.0, 1.0),
+            texcoord: vec2(0.0, 4.0),
+        });
+        mesh.add_vertex(Vertex {
+            position: vec3(-1.0, -1.0, 0.0),
+            normal: vec3(0.0, 0.0, 1.0),
+            texcoord: vec2(0.0, 0.0),
+        });
+        mesh.add_vertex(Vertex {
+            position: vec3(3.0, -1.0, 0.0),
+            normal: vec3(0.0, 0.0, 1.0),
+            texcoord: vec2(4.0, 0.0),
+        });
+
+        let vertex_buffer = device.create_buffer_init(&BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(mesh.vertex_data()),
+            usage: BufferUsages::VERTEX,
+        });
+
+        let fullscreen_triangle = MeshBuffer {
+            vertex_buffer,
+            index_buffer: None,
+            num_indices: 0,
+            num_vertices: mesh.num_vertices(),
+        };
+
         let mut renderer = Self {
             surface,
             adapter,
@@ -112,6 +144,7 @@ impl Renderer {
             queue,
 
             render_pipeline,
+            fullscreen_triangle,
 
             window,
         };
@@ -151,7 +184,7 @@ impl Renderer {
         self.surface.configure(&self.device, &self.surface_config);
     }
 
-    pub fn render(&mut self, mesh_buffer: &MeshBuffer) {
+    pub fn render(&mut self) {
         let mut encoder = self
             .device
             .create_command_encoder(&CommandEncoderDescriptor::default());
@@ -180,13 +213,8 @@ impl Renderer {
 
             render_pass.set_pipeline(&self.render_pipeline);
 
-            render_pass.set_vertex_buffer(0, mesh_buffer.vertex_buffer.slice(..));
-            if let Some(index_buffer) = &mesh_buffer.index_buffer {
-                render_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-                render_pass.draw_indexed(0..mesh_buffer.num_indices, 0, 0..1);
-            } else {
-                render_pass.draw(0..mesh_buffer.num_vertices, 0..1);
-            }
+            render_pass.set_vertex_buffer(0, self.fullscreen_triangle.vertex_buffer.slice(..));
+            render_pass.draw(0..self.fullscreen_triangle.num_vertices, 0..1);
         }
 
         self.queue.submit([encoder.finish()]);
