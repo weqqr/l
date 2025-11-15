@@ -3,7 +3,7 @@
 
 use std::{error::Error, path::PathBuf};
 
-use glam::{Vec3, vec3};
+use glam::{Vec3, ivec3};
 use winit::dpi::PhysicalSize;
 use winit::event::{DeviceEvent, DeviceId};
 use winit::event_loop::ControlFlow;
@@ -17,6 +17,9 @@ use winit::{
 
 use crate::camera::Camera;
 use crate::input::Input;
+use crate::node::GlobalMapping;
+use crate::render::DataBuffer;
+use crate::world::Block;
 use crate::{
     render::Renderer,
     world::{Map, SqliteBackend, WorldMeta},
@@ -25,6 +28,7 @@ use crate::{
 pub mod asset;
 pub mod camera;
 pub mod input;
+pub(crate) mod node;
 pub mod render;
 pub mod world;
 
@@ -32,14 +36,20 @@ struct App {
     renderer: Option<Renderer>,
     camera: Camera,
     input: Input,
+    map: Map,
+    global_mapping: GlobalMapping,
+    grid: Option<DataBuffer>,
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub fn new(map: Map) -> Self {
         Self {
             renderer: None,
             camera: Camera::new(),
             input: Input::new(),
+            map,
+            global_mapping: GlobalMapping::new(),
+            grid: None,
         }
     }
 }
@@ -49,16 +59,25 @@ impl ApplicationHandler for App {
         let window_attributes = Window::default_attributes()
             .with_title("Light")
             .with_inner_size(PhysicalSize::new(1280, 720));
+
         let window = event_loop.create_window(window_attributes).unwrap();
         let renderer = Renderer::new(window);
-        let adapter_info = renderer.adapter_info();
 
+        let adapter_info = renderer.adapter_info();
         renderer.window().set_title(&format!(
             "Light ({} on {})",
             adapter_info.backend, adapter_info.name
         ));
 
-        self.renderer = Some(renderer)
+        let air_id = self.global_mapping.get_or_insert_id("air");
+        assert_eq!(air_id, 0);
+
+        let block = self.map.get_block(ivec3(0, 2, 0)).unwrap();
+        let grid = block_to_grid(&block, &mut self.global_mapping);
+        let grid = renderer.create_data_buffer(bytemuck::cast_slice(&grid));
+
+        self.renderer = Some(renderer);
+        self.grid = Some(grid);
     }
 
     fn window_event(
@@ -101,6 +120,10 @@ impl ApplicationHandler for App {
             return;
         };
 
+        let Some(grid) = &self.grid else {
+            return;
+        };
+
         let (forward, right) = self.camera.forward_right();
         let speed = 0.1;
 
@@ -137,7 +160,7 @@ impl ApplicationHandler for App {
         self.camera.rotate(mouse_delta.y, mouse_delta.x);
         self.input.reset_mouse_delta();
 
-        renderer.render(&self.camera);
+        renderer.render(&self.camera, grid);
     }
 }
 
@@ -170,9 +193,33 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     let event_loop = EventLoop::new()?;
-    let mut app = App::new();
+    let mut app = App::new(map);
 
     event_loop.run_app(&mut app)?;
 
     Ok(())
+}
+
+fn block_to_grid(block: &Block, global_mapping: &mut GlobalMapping) -> Vec<u32> {
+    let mut data = vec![0; 16 * 16 * 16];
+
+    for z in 0..16 {
+        for y in 0..16 {
+            for x in 0..16 {
+                let node = block.get_node(ivec3(x, y, z));
+                let name = block.get_name_by_id(node.id).unwrap();
+                let global_id = global_mapping.get_or_insert_id(name);
+
+                let mut value = 0;
+                value |= (global_id as u32) << 16;
+                value |= node.param1 as u32;
+                value |= node.param2 as u32;
+
+                let index = (z * 16 * 16 + y * 16 + x) as usize;
+                data[index] = value;
+            }
+        }
+    }
+
+    data
 }

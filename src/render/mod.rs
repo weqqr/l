@@ -8,7 +8,7 @@ use wgpu::{
     InstanceDescriptor, LoadOp, Operations, PipelineLayoutDescriptor, PowerPreference,
     PrimitiveState, PrimitiveTopology, Queue, RenderPassColorAttachment, RenderPassDescriptor,
     RenderPipeline, RenderPipelineDescriptor, RequestAdapterOptions, ShaderModuleDescriptor,
-    ShaderStages, ShaderSource, StoreOp, Surface, SurfaceConfiguration, SurfaceTargetUnsafe,
+    ShaderSource, ShaderStages, StoreOp, Surface, SurfaceConfiguration, SurfaceTargetUnsafe,
     VertexAttribute, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
 };
 use wgpu::{AdapterInfo, CommandEncoderDescriptor, TextureViewDescriptor};
@@ -36,7 +36,6 @@ pub struct Renderer {
     render_pipeline: RenderPipeline,
     fullscreen_triangle: MeshBuffer,
     bind_group_layout: BindGroupLayout,
-    bind_group: BindGroup,
     uniform_buffer: Buffer,
 
     window: Window,
@@ -79,16 +78,28 @@ impl Renderer {
 
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
-            entries: &[BindGroupLayoutEntry {
-                binding: 0,
-                visibility: ShaderStages::FRAGMENT,
-                ty: BindingType::Buffer {
-                    ty: BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+            entries: &[
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
                 },
-                count: None,
-            }],
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
         });
 
         let render_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -172,15 +183,6 @@ impl Renderer {
             mapped_at_creation: false,
         });
 
-        let bind_group = device.create_bind_group(&BindGroupDescriptor {
-            label: None,
-            layout: &bind_group_layout,
-            entries: &[BindGroupEntry {
-                binding: 0,
-                resource: uniform_buffer.as_entire_binding(),
-            }],
-        });
-
         let mut renderer = Self {
             surface,
             adapter,
@@ -191,7 +193,6 @@ impl Renderer {
             render_pipeline,
             fullscreen_triangle,
             bind_group_layout,
-            bind_group,
             uniform_buffer,
 
             window,
@@ -217,6 +218,16 @@ impl Renderer {
         }
     }
 
+    pub fn create_data_buffer(&self, data: &[u8]) -> DataBuffer {
+        let buffer = self.device.create_buffer_init(&BufferInitDescriptor {
+            label: None,
+            contents: &data,
+            usage: BufferUsages::STORAGE,
+        });
+
+        DataBuffer { buffer }
+    }
+
     pub fn adapter_info(&self) -> AdapterInfo {
         self.adapter.get_info()
     }
@@ -232,7 +243,7 @@ impl Renderer {
         self.surface.configure(&self.device, &self.surface_config);
     }
 
-    pub fn render(&mut self, camera: &Camera) {
+    pub fn render(&mut self, camera: &Camera, data: &DataBuffer) {
         let mut encoder = self
             .device
             .create_command_encoder(&CommandEncoderDescriptor::default());
@@ -255,11 +266,23 @@ impl Renderer {
             aspect_ratio,
         };
 
-        self.queue.write_buffer(
-            &self.uniform_buffer,
-            0,
-            bytemuck::cast_slice(&[uniforms]),
-        );
+        let bind_group = self.device.create_bind_group(&BindGroupDescriptor {
+            label: None,
+            layout: &self.bind_group_layout,
+            entries: &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: self.uniform_buffer.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: data.buffer.as_entire_binding(),
+                },
+            ],
+        });
+
+        self.queue
+            .write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
 
         {
             let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
@@ -279,7 +302,7 @@ impl Renderer {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.bind_group, &[]);
+            render_pass.set_bind_group(0, &bind_group, &[]);
 
             render_pass.set_vertex_buffer(0, self.fullscreen_triangle.vertex_buffer.slice(..));
             render_pass.draw(0..self.fullscreen_triangle.num_vertices, 0..1);
@@ -326,4 +349,8 @@ fn vertex_layout() -> VertexBufferLayout<'static> {
         step_mode: VertexStepMode::Vertex,
         attributes: &ATTRIBUTES,
     }
+}
+
+pub struct DataBuffer {
+    buffer: Buffer,
 }
