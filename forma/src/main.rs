@@ -1,6 +1,8 @@
 pub mod ui;
+pub mod world_manager;
 
 use std::error::Error;
+use std::sync::{Arc, Mutex};
 
 use egui::ViewportId;
 use egui::gui_zoom::kb_shortcuts::{ZOOM_IN, ZOOM_OUT};
@@ -14,12 +16,14 @@ use winit::raw_window_handle::HasDisplayHandle;
 use winit::window::{Window, WindowId};
 
 use crate::ui::Ui;
+use crate::world_manager::WorldManager;
 
 struct App {
     ctx: egui::Context,
     egui_winit_state: egui_winit::State,
     egui_renderer: Option<egui_wgpu::Renderer>,
     renderer: Option<Renderer>,
+    world_manager: Arc<Mutex<WorldManager>>,
     ui: Ui,
 }
 
@@ -36,12 +40,15 @@ impl App {
             None,
         );
 
+        let world_manager = Arc::new(Mutex::new(WorldManager::new()));
+
         Self {
             ctx,
             egui_winit_state,
             egui_renderer: None,
             renderer: None,
-            ui: Ui::new(),
+            world_manager: Arc::clone(&world_manager),
+            ui: Ui::new(world_manager),
         }
     }
 
@@ -150,7 +157,7 @@ impl ApplicationHandler for App {
         }
     }
 
-    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
         if let Some(renderer) = &mut self.renderer {
             renderer.window().request_redraw();
         }

@@ -5,11 +5,15 @@ edition = "2024"
 
 [dependencies]
 render.workspace = true
+world.workspace = true
 
 egui.workspace = true
 egui-wgpu.workspace = true
 egui-winit.workspace = true
+rfd.workspace = true
+uuid = { workspace = true, features = ["v4"] }
 winit.workspace = true
+anyhow = "1.0.100"
 
 [lints]
 workspace = true
