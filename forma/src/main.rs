@@ -1,6 +1,10 @@
+pub mod ui;
+
 use std::error::Error;
 
 use egui::ViewportId;
+use egui::gui_zoom::kb_shortcuts::{ZOOM_IN, ZOOM_OUT};
+use egui::gui_zoom::{zoom_in, zoom_out};
 use render::Renderer;
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
@@ -9,11 +13,14 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::raw_window_handle::HasDisplayHandle;
 use winit::window::{Window, WindowId};
 
+use crate::ui::Ui;
+
 struct App {
     ctx: egui::Context,
     egui_winit_state: egui_winit::State,
     egui_renderer: Option<egui_wgpu::Renderer>,
     renderer: Option<Renderer>,
+    ui: Ui,
 }
 
 impl App {
@@ -34,6 +41,7 @@ impl App {
             egui_winit_state,
             egui_renderer: None,
             renderer: None,
+            ui: Ui::new(),
         }
     }
 
@@ -49,12 +57,17 @@ impl App {
         let raw_input: egui::RawInput = self.egui_winit_state.take_egui_input(renderer.window());
 
         let full_output = self.ctx.run(raw_input, |ctx| {
-            egui::CentralPanel::default().show(ctx, |ui| {
-                ui.label("Hello world!");
-                if ui.button("Click me").clicked() {
-                    println!("clicked");
-                }
-            });
+            self.ui.ui(ctx);
+        });
+
+        self.ctx.input_mut(|input| {
+            if input.consume_shortcut(&ZOOM_IN) {
+                zoom_in(&self.ctx);
+            }
+
+            if input.consume_shortcut(&ZOOM_OUT) {
+                zoom_out(&self.ctx);
+            }
         });
 
         self.egui_winit_state
@@ -70,7 +83,7 @@ impl App {
 
         let screen_descriptor = egui_wgpu::ScreenDescriptor {
             size_in_pixels: renderer.window().inner_size().into(),
-            pixels_per_point: renderer.window().scale_factor() as f32,
+            pixels_per_point: renderer.window().scale_factor() as f32 * self.ctx.zoom_factor(),
         };
 
         renderer.render(|renderer, encoder, rp| {
