@@ -36,6 +36,4 @@ impl WorldManager {
     pub fn world_by_id(&self, id: Uuid) -> Option<&World> {
         self.worlds.get(&id)
     }
-
-    pub fn world() {}
 }

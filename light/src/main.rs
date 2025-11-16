@@ -22,10 +22,9 @@ use crate::node::GlobalMapping;
 use crate::render::DataBuffer;
 use crate::render::Renderer;
 
-pub mod asset;
 pub mod camera;
 pub mod input;
-pub(crate) mod node;
+pub mod node;
 pub mod render;
 
 struct App {

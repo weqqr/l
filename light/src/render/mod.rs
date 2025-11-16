@@ -14,7 +14,7 @@ use wgpu::{
 use wgpu::{AdapterInfo, CommandEncoderDescriptor, TextureViewDescriptor};
 use winit::{dpi::PhysicalSize, window::Window};
 
-use crate::asset::{Mesh, Vertex};
+use asset::{Mesh, Vertex};
 use crate::camera::Camera;
 
 #[repr(C)]

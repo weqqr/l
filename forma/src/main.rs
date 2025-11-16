@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 
 use egui::ThemePreference;
 use egui_wgpu::WgpuConfiguration;
+use render::VoxelRenderer;
 
 use crate::ui::View;
 use crate::world_manager::WorldManager;
@@ -16,6 +17,17 @@ struct App {
 
 impl App {
     pub fn new(cc: &eframe::CreationContext) -> Self {
+        let wgpu_render_state = cc.wgpu_render_state.as_ref().unwrap();
+
+        let voxel_renderer =
+            VoxelRenderer::new(&wgpu_render_state.device, wgpu_render_state.target_format);
+
+        wgpu_render_state
+            .renderer
+            .write()
+            .callback_resources
+            .insert(voxel_renderer);
+
         cc.egui_ctx.set_theme(ThemePreference::Dark);
         let world_manager = Arc::new(Mutex::new(WorldManager::new()));
 
@@ -39,11 +51,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let native_options = eframe::NativeOptions {
         renderer: eframe::Renderer::Wgpu,
         centered: true,
-        vsync: false,
-        wgpu_options: WgpuConfiguration {
-            present_mode: eframe::wgpu::PresentMode::Mailbox,
-            ..Default::default()
-        },
+        vsync: true,
+        viewport: egui::ViewportBuilder::default().with_inner_size([1280.0, 720.0]),
+        // wgpu_options: WgpuConfiguration {
+        //     present_mode: eframe::wgpu::PresentMode::Mailbox,
+        //     ..Default::default()
+        // },
         ..Default::default()
     };
 

@@ -4,10 +4,11 @@ use std::sync::{Arc, Mutex};
 use anyhow::{Result, anyhow};
 use egui::epaint::CircleShape;
 use egui::{
-    Align2, Color32, Context, Frame, Key, Margin, Modifiers, RichText, ScrollArea, Sense,
-    Shape, TextEdit, TextStyle, Vec2,
+    Align2, Area, Color32, Context, Frame, Id, Key, LayerId, Margin, Modifiers, RichText,
+    ScrollArea, Sense, Shape, TextEdit, TextStyle, UiBuilder, Vec2,
 };
 use egui_tiles::{Behavior, Container, ContainerKind, SimplificationOptions, Tile, Tree};
+use render::VoxelRenderer;
 use uuid::Uuid;
 
 use crate::world_manager::WorldManager;
@@ -70,14 +71,6 @@ impl View {
                     .desired_width(f32::INFINITY)
                     .show(ui);
                 edit_response.response.request_focus();
-
-                ScrollArea::new([false, true])
-                    .auto_shrink(false)
-                    .show(ui, |ui| {
-                        for command in &self.controller.command_history {
-                            ui.label(RichText::new(command).monospace());
-                        }
-                    });
             });
 
         if self.show_command_console {
@@ -143,14 +136,28 @@ impl Behavior<Pane> for TreeController {
     ) -> egui_tiles::UiResponse {
         match pane {
             Pane::World(id) => {
-                let (response, painter) =
-                    ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
-                let circle = Shape::Circle(CircleShape::filled(
-                    response.rect.center(),
-                    response.rect.center().y,
-                    Color32::DARK_BLUE,
-                ));
-                painter.add(circle);
+                let rect = ui.available_rect_before_wrap();
+                ui.scope_builder(UiBuilder::new().max_rect(rect), |ui| {
+                    let (response, painter) =
+                        ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
+
+                    painter.add(egui_wgpu::Callback::new_paint_callback(
+                        response.rect,
+                        WorldViewCallback::new(*id),
+                    ));
+                });
+                ui.scope_builder(UiBuilder::new().max_rect(rect), |ui| {
+                    ui.label(
+                        RichText::new("View: X=0 Y=0 Z=0")
+                            .monospace()
+                            .color(Color32::RED),
+                    );
+                    ui.label(
+                        RichText::new("Cursor: X=0 Y=0 Z=0")
+                            .monospace()
+                            .color(Color32::RED),
+                    );
+                });
             }
         }
         Default::default()
@@ -209,5 +216,27 @@ impl Controller {
         if self.command_history.len() > 100 {
             self.command_history.drain(100..);
         }
+    }
+}
+
+struct WorldViewCallback {
+    world_id: Uuid,
+}
+
+impl WorldViewCallback {
+    pub fn new(world_id: Uuid) -> Self {
+        Self { world_id }
+    }
+}
+
+impl egui_wgpu::CallbackTrait for WorldViewCallback {
+    fn paint(
+        &self,
+        info: egui::PaintCallbackInfo,
+        render_pass: &mut eframe::wgpu::RenderPass<'static>,
+        callback_resources: &egui_wgpu::CallbackResources,
+    ) {
+        let voxel_renderer = callback_resources.get::<VoxelRenderer>().unwrap();
+        voxel_renderer.render(render_pass);
     }
 }

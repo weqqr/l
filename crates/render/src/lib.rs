@@ -1,128 +1,117 @@
-use pollster::FutureExt;
+use asset::{Mesh, Vertex};
+use glam::{vec2, vec3};
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use wgpu::*;
-use winit::dpi::PhysicalSize;
-use winit::window::Window;
 
-pub struct Renderer {
-    surface: Surface<'static>,
-    adapter: Adapter,
-    surface_config: SurfaceConfiguration,
-    device: Device,
-    queue: Queue,
-
-    window: Window,
+pub struct VoxelRenderer {
+    pipeline: RenderPipeline,
+    vertex_buffer: Buffer,
 }
 
-impl Renderer {
-    pub fn new(window: Window) -> Self {
-        let instance = Instance::new(&InstanceDescriptor::default());
+impl VoxelRenderer {
+    pub fn new(device: &Device, target_format: TextureFormat) -> Self {
+        let shader_module = device.create_shader_module(include_wgsl!("shader.wgsl"));
 
-        // SAFETY: Window has the same lifetime as surface
-        let surface = unsafe {
-            instance
-                .create_surface_unsafe(SurfaceTargetUnsafe::from_window(&window).unwrap())
-                .unwrap()
+        let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: None,
+            bind_group_layouts: &[],
+            push_constant_ranges: &[],
+        });
+
+        let vertex_layout = VertexBufferLayout {
+            array_stride: 8 * 4,
+            step_mode: VertexStepMode::Vertex,
+            attributes: &[
+                VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: VertexFormat::Float32x3,
+                },
+                VertexAttribute {
+                    offset: 3 * 4,
+                    shader_location: 1,
+                    format: VertexFormat::Float32x3,
+                },
+                VertexAttribute {
+                    offset: 6 * 4,
+                    shader_location: 2,
+                    format: VertexFormat::Float32x2,
+                },
+            ],
         };
 
-        let adapter = instance
-            .request_adapter(&RequestAdapterOptions {
-                power_preference: PowerPreference::HighPerformance,
-                force_fallback_adapter: false,
-                compatible_surface: Some(&surface),
-            })
-            .block_on()
-            .unwrap();
-
-        let inner_size = window.inner_size();
-        let mut surface_config = surface
-            .get_default_config(&adapter, inner_size.width, inner_size.height)
-            .unwrap();
-        surface_config.present_mode = PresentMode::AutoNoVsync;
-
-        let (device, queue) = adapter
-            .request_device(&DeviceDescriptor::default())
-            .block_on()
-            .unwrap();
-
-        let mut renderer = Self {
-            surface,
-            adapter,
-            surface_config,
-            device,
-            queue,
-
-            window,
-        };
-
-        renderer.resize(inner_size);
-
-        renderer
-    }
-
-    pub fn adapter_info(&self) -> AdapterInfo {
-        self.adapter.get_info()
-    }
-
-    pub fn resize(&mut self, size: PhysicalSize<u32>) {
-        if size.width == 0 || size.height == 0 {
-            return;
-        }
-
-        self.surface_config.width = size.width;
-        self.surface_config.height = size.height;
-
-        self.surface.configure(&self.device, &self.surface_config);
-    }
-
-    pub fn render(&mut self, mut render: impl FnMut(&mut Self, &mut CommandEncoder, &mut RenderPass<'static>)) {
-        let mut encoder = self
-            .device
-            .create_command_encoder(&CommandEncoderDescriptor::default());
-
-        let surface_texture = self.surface.get_current_texture().unwrap();
-        let surface_texture_view = surface_texture
-            .texture
-            .create_view(&TextureViewDescriptor::default());
-
-        {
-            let mut rp = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(RenderPassColorAttachment {
-                    view: &surface_texture_view,
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: Operations {
-                        load: LoadOp::Clear(Color::BLACK),
-                        store: StoreOp::Store,
-                    },
+        let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+            label: None,
+            layout: Some(&pipeline_layout),
+            vertex: VertexState {
+                module: &shader_module,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[vertex_layout],
+            },
+            fragment: Some(FragmentState {
+                module: &shader_module,
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: target_format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
                 })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            }).forget_lifetime();
+            }),
+            primitive: PrimitiveState {
+                topology: PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+            cache: None,
+        });
 
-            render(self, &mut encoder, &mut rp);
+        let mut mesh = Mesh::new();
+        mesh.add_vertex(Vertex {
+            position: vec3(-1.0, 3.0, 0.0),
+            normal: vec3(0.0, 0.0, 1.0),
+            texcoord: vec2(0.0, 4.0),
+        });
+        mesh.add_vertex(Vertex {
+            position: vec3(-1.0, -1.0, 0.0),
+            normal: vec3(0.0, 0.0, 1.0),
+            texcoord: vec2(0.0, 0.0),
+        });
+        mesh.add_vertex(Vertex {
+            position: vec3(3.0, -1.0, 0.0),
+            normal: vec3(0.0, 0.0, 1.0),
+            texcoord: vec2(4.0, 0.0),
+        });
+
+        let vertex_buffer = device.create_buffer_init(&BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(mesh.vertex_data()),
+            usage: BufferUsages::VERTEX,
+        });
+
+        Self {
+            pipeline,
+            vertex_buffer,
         }
-
-
-        self.queue.submit([encoder.finish()]);
-
-        surface_texture.present();
     }
 
-    pub fn device(&self) -> &Device {
-        &self.device
-    }
+    pub fn prepare() {}
 
-    pub fn queue(&self) -> &Queue {
-        &self.queue
-    }
-
-    pub fn surface_config(&self) -> &SurfaceConfiguration {
-        &self.surface_config
-    }
-
-    pub fn window(&self) -> &Window {
-        &self.window
+    pub fn render(&self, rp: &mut RenderPass) {
+        rp.set_pipeline(&self.pipeline);
+        rp.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        rp.draw(0..3, 0..1);
     }
 }
