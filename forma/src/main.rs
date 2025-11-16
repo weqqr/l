@@ -12,6 +12,7 @@ use winit::window::{Window, WindowId};
 struct App {
     ctx: egui::Context,
     egui_winit_state: egui_winit::State,
+    egui_renderer: Option<egui_wgpu::Renderer>,
     renderer: Option<Renderer>,
 }
 
@@ -31,7 +32,60 @@ impl App {
         Self {
             ctx,
             egui_winit_state,
+            egui_renderer: None,
             renderer: None,
+        }
+    }
+
+    pub fn paint(&mut self) {
+        let Some(renderer) = &mut self.renderer else {
+            return;
+        };
+
+        let Some(egui_renderer) = &mut self.egui_renderer else {
+            return;
+        };
+
+        let raw_input: egui::RawInput = self.egui_winit_state.take_egui_input(renderer.window());
+
+        let full_output = self.ctx.run(raw_input, |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.label("Hello world!");
+                if ui.button("Click me").clicked() {
+                    println!("clicked");
+                }
+            });
+        });
+
+        self.egui_winit_state
+            .handle_platform_output(renderer.window(), full_output.platform_output);
+
+        let clipped_primitives = self
+            .ctx
+            .tessellate(full_output.shapes, full_output.pixels_per_point);
+
+        for (id, image_delta) in full_output.textures_delta.set {
+            egui_renderer.update_texture(renderer.device(), renderer.queue(), id, &image_delta);
+        }
+
+        let screen_descriptor = egui_wgpu::ScreenDescriptor {
+            size_in_pixels: renderer.window().inner_size().into(),
+            pixels_per_point: renderer.window().scale_factor() as f32,
+        };
+
+        renderer.render(|renderer, encoder, rp| {
+            egui_renderer.update_buffers(
+                renderer.device(),
+                renderer.queue(),
+                encoder,
+                &clipped_primitives,
+                &screen_descriptor,
+            );
+            egui_renderer.render(rp, &clipped_primitives, &screen_descriptor);
+        });
+
+        for id in full_output.textures_delta.free {
+            egui_renderer.free_texture(&id);
         }
     }
 }
@@ -45,7 +99,14 @@ impl ApplicationHandler for App {
         let window = event_loop.create_window(window_attributes).unwrap();
         let renderer = Renderer::new(window);
 
+        let egui_renderer = egui_wgpu::Renderer::new(
+            renderer.device(),
+            renderer.surface_config().format,
+            egui_wgpu::RendererOptions::default(),
+        );
+
         self.renderer = Some(renderer);
+        self.egui_renderer = Some(egui_renderer);
     }
 
     fn window_event(
@@ -70,9 +131,7 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::RedrawRequested => {
-                if let Some(renderer) = &mut self.renderer {
-                    renderer.render();
-                }
+                self.paint();
             }
             _ => {}
         }
@@ -80,24 +139,7 @@ impl ApplicationHandler for App {
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         if let Some(renderer) = &mut self.renderer {
-            let raw_input: egui::RawInput =
-                self.egui_winit_state.take_egui_input(renderer.window());
-
-            let full_output = self.ctx.run(raw_input, |ctx| {
-                egui::CentralPanel::default().show(ctx, |ui| {
-                    ui.label("Hello world!");
-                    if ui.button("Click me").clicked() {
-                        println!("clicked");
-                    }
-                });
-            });
-
-            self.egui_winit_state
-                .handle_platform_output(renderer.window(), full_output.platform_output);
-
-            let clipped_primitives = self
-                .ctx
-                .tessellate(full_output.shapes, full_output.pixels_per_point);
+            renderer.window().request_redraw();
         }
     }
 }

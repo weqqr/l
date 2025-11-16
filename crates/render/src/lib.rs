@@ -74,7 +74,7 @@ impl Renderer {
         self.surface.configure(&self.device, &self.surface_config);
     }
 
-    pub fn render(&mut self) {
+    pub fn render(&mut self, mut render: impl FnMut(&mut Self, &mut CommandEncoder, &mut RenderPass<'static>)) {
         let mut encoder = self
             .device
             .create_command_encoder(&CommandEncoderDescriptor::default());
@@ -85,7 +85,7 @@ impl Renderer {
             .create_view(&TextureViewDescriptor::default());
 
         {
-            let _rp = encoder.begin_render_pass(&RenderPassDescriptor {
+            let mut rp = encoder.begin_render_pass(&RenderPassDescriptor {
                 label: None,
                 color_attachments: &[Some(RenderPassColorAttachment {
                     view: &surface_texture_view,
@@ -99,8 +99,11 @@ impl Renderer {
                 depth_stencil_attachment: None,
                 timestamp_writes: None,
                 occlusion_query_set: None,
-            });
+            }).forget_lifetime();
+
+            render(self, &mut encoder, &mut rp);
         }
+
 
         self.queue.submit([encoder.finish()]);
 
@@ -109,6 +112,14 @@ impl Renderer {
 
     pub fn device(&self) -> &Device {
         &self.device
+    }
+
+    pub fn queue(&self) -> &Queue {
+        &self.queue
+    }
+
+    pub fn surface_config(&self) -> &SurfaceConfiguration {
+        &self.surface_config
     }
 
     pub fn window(&self) -> &Window {
