@@ -26,3 +26,6 @@ thiserror = "2.0.17"
 wgpu = "27.0.1"
 winit = "0.30.12"
 zstd = "0.13.3"
+
+[workspace.lints]
+clippy.new_without_default = "allow"

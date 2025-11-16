@@ -12,3 +12,6 @@ pollster.workspace = true
 thiserror.workspace = true
 wgpu.workspace = true
 winit.workspace = true
+
+[lints]
+workspace = true

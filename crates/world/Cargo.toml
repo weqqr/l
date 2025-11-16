@@ -8,3 +8,6 @@ glam.workspace = true
 rusqlite = { workspace = true, features = ["bundled"] }
 thiserror.workspace = true
 zstd.workspace = true
+
+[lints]
+workspace = true

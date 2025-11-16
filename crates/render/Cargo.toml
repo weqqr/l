@@ -7,3 +7,6 @@ edition = "2024"
 pollster.workspace = true
 wgpu.workspace = true
 winit.workspace = true
+
+[lints]
+workspace = true
