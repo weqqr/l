@@ -1,13 +1,13 @@
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use uuid::Uuid;
-use world::{Map, SqliteBackend, WorldMeta};
+use world::World;
 
 pub struct WorldManager {
-    worlds: HashMap<Uuid, Map>,
-    path_to_id: HashMap<String, Uuid>,
+    worlds: HashMap<Uuid, World>,
+    path_to_id: HashMap<PathBuf, Uuid>,
 }
 
 impl WorldManager {
@@ -19,28 +19,21 @@ impl WorldManager {
     }
 
     pub fn open(&mut self, path: impl AsRef<Path>) -> Result<Uuid> {
-        let meta_path = path.as_ref().join("world.mt");
-        let meta = WorldMeta::open(meta_path).context("read world metadata")?;
-        let backend = meta.get_str("backend").unwrap();
+        let path = path.as_ref().canonicalize()?.to_path_buf();
 
-        let map = match backend {
-            "sqlite3" => {
-                let sqlite_path = path.as_ref().join("map.sqlite");
-                let sqlite = SqliteBackend::new(sqlite_path)?;
-                Map::new(sqlite)
-            }
-            _ => {
-                return Err(anyhow!("unknown backend: {backend}"));
-            }
-        };
+        if let Some(id) = self.path_to_id.get(&path) {
+            return Ok(*id);
+        }
+
+        let world = World::open(&path).context("Unable to open world")?;
 
         let id = Uuid::new_v4();
-        self.worlds.insert(id, map);
+        self.worlds.insert(id, world);
 
         Ok(id)
     }
 
-    pub fn map_by_id(&self, id: Uuid) -> Option<&Map> {
+    pub fn world_by_id(&self, id: Uuid) -> Option<&World> {
         self.worlds.get(&id)
     }
 

@@ -1,13 +1,20 @@
 use std::{collections::HashMap, path::Path};
 
-use crate::Error;
-
 pub struct WorldMeta {
     values: HashMap<String, String>,
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum MetaError {
+    #[error("invalid format: `{0}`")]
+    InvalidFormat(String),
+
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
+}
+
 impl WorldMeta {
-    pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, MetaError> {
         let data = std::fs::read_to_string(path)?;
 
         let mut values = HashMap::new();
@@ -20,7 +27,7 @@ impl WorldMeta {
 
             let (key, value) = line
                 .split_once("=")
-                .ok_or_else(|| Error::UnexpectedFormat(line.to_string()))?;
+                .ok_or_else(|| MetaError::InvalidFormat(line.to_string()))?;
 
             values.insert(key.trim().to_string(), value.trim().to_string());
         }

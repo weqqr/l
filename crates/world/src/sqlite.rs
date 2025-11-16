@@ -2,14 +2,14 @@ use std::path::Path;
 
 use rusqlite::Connection;
 
-use crate::{Error, MapBackend};
+use crate::{MapError, MapBackend};
 
 pub struct SqliteBackend {
     conn: Connection,
 }
 
 impl SqliteBackend {
-    pub fn new(path: impl AsRef<Path>) -> Result<Self, Error> {
+    pub fn new(path: impl AsRef<Path>) -> Result<Self, MapError> {
         let conn = Connection::open(path)?;
 
         Ok(Self { conn })
@@ -17,7 +17,7 @@ impl SqliteBackend {
 }
 
 impl MapBackend for SqliteBackend {
-    fn get_block_data(&mut self, pos: glam::IVec3) -> Result<Vec<u8>, Error> {
+    fn get_block_data(&mut self, pos: glam::IVec3) -> Result<Vec<u8>, MapError> {
         const SQL: &str = "
             SELECT data
             FROM blocks

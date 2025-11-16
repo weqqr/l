@@ -16,7 +16,9 @@ render = { path = "crates/render" }
 world = { path = "crates/world" }
 
 bytemuck = "1.4"
+eframe = "0.33.2"
 egui = "0.33.2"
+egui_tiles = "0.14.0"
 egui-wgpu = "0.33.2"
 egui-winit = "0.33.2"
 glam = "0.30.9"

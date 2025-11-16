@@ -9,7 +9,7 @@ use glam::IVec3;
 
 // TODO: split this
 #[derive(thiserror::Error, Debug)]
-pub enum Error {
+pub enum MapError {
     #[error("block not found")]
     BlockNotFound,
 
@@ -40,14 +40,14 @@ impl Map {
         }
     }
 
-    pub fn get_block(&self, pos: IVec3) -> Result<Block, Error> {
+    pub fn get_block(&self, pos: IVec3) -> Result<Block, MapError> {
         let data = self.backend.lock().unwrap().get_block_data(pos)?;
         Block::parse_data(&data)
     }
 }
 
 pub trait MapBackend: 'static {
-    fn get_block_data(&mut self, pos: IVec3) -> Result<Vec<u8>, Error>;
+    fn get_block_data(&mut self, pos: IVec3) -> Result<Vec<u8>, MapError>;
 }
 
 pub struct Block {
@@ -64,12 +64,12 @@ pub struct Node {
 impl Block {
     const VOLUME: usize = 16 * 16 * 16;
 
-    pub fn parse_data(data: &[u8]) -> Result<Self, Error> {
+    pub fn parse_data(data: &[u8]) -> Result<Self, MapError> {
         let mut cur = Cursor::new(data);
         let version = read_u8(&mut cur)?;
 
         if version < 29 {
-            return Err(Error::UnsupportedVersion(version));
+            return Err(MapError::UnsupportedVersion(version));
         }
 
         let mut decoder = zstd::Decoder::new(&mut cur)?;
@@ -152,7 +152,7 @@ fn read_u32(r: &mut impl Read) -> Result<u32, std::io::Error> {
     Ok(u32::from_be_bytes(buf))
 }
 
-fn read_string(r: &mut impl Read) -> Result<String, Error> {
+fn read_string(r: &mut impl Read) -> Result<String, MapError> {
     let len = read_u16(r)?;
     let mut data = vec![0; len as usize];
     r.read_exact(&mut data)?;

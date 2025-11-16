@@ -7,9 +7,11 @@ edition = "2024"
 render.workspace = true
 world.workspace = true
 
+eframe = { workspace = true, features = ["wgpu"] }
 egui.workspace = true
 egui-wgpu.workspace = true
 egui-winit.workspace = true
+egui_tiles.workspace = true
 rfd.workspace = true
 uuid = { workspace = true, features = ["v4"] }
 winit.workspace = true
