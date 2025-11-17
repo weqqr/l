@@ -4,8 +4,8 @@ use std::sync::{Arc, Mutex};
 use anyhow::{Result, anyhow};
 use egui::epaint::CircleShape;
 use egui::{
-    Align2, Area, Color32, Context, Frame, Id, Key, LayerId, Margin, Modifiers, RichText,
-    ScrollArea, Sense, Shape, TextEdit, TextStyle, UiBuilder, Vec2,
+    Align2, Area, Color32, Context, Frame, Id, Key, LayerId, Margin, Modifiers, Popup, PopupKind,
+    RichText, ScrollArea, Sense, Shape, TextEdit, TextStyle, UiBuilder, Vec2,
 };
 use egui_tiles::{Behavior, Container, ContainerKind, SimplificationOptions, Tile, Tree};
 use render::VoxelRenderer;
@@ -145,18 +145,13 @@ impl Behavior<Pane> for TreeController {
                         response.rect,
                         WorldViewCallback::new(*id),
                     ));
+
+                    if response.secondary_clicked() {
+                        println!("right click");
+                    }
                 });
                 ui.scope_builder(UiBuilder::new().max_rect(rect), |ui| {
-                    ui.label(
-                        RichText::new("View: X=0 Y=0 Z=0")
-                            .monospace()
-                            .color(Color32::RED),
-                    );
-                    ui.label(
-                        RichText::new("Cursor: X=0 Y=0 Z=0")
-                            .monospace()
-                            .color(Color32::RED),
-                    );
+                    ui.label(RichText::new("Cursor: X=0 Y=0 Z=0").color(Color32::BLACK));
                 });
             }
         }

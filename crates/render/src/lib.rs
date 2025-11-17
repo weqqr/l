@@ -1,3 +1,5 @@
+pub mod meshing;
+
 use asset::{Mesh, Vertex};
 use glam::{vec2, vec3};
 use wgpu::util::{BufferInitDescriptor, DeviceExt};
@@ -106,8 +108,6 @@ impl VoxelRenderer {
             vertex_buffer,
         }
     }
-
-    pub fn prepare() {}
 
     pub fn render(&self, rp: &mut RenderPass) {
         rp.set_pipeline(&self.pipeline);

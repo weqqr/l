@@ -1,5 +1,6 @@
 use glam::{Vec2, Vec3};
 
+#[derive(Clone)]
 pub struct Vertex {
     pub position: Vec3,
     pub normal: Vec3,

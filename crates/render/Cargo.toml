@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 asset.workspace = true
+world.workspace = true
 
 bytemuck.workspace = true
 glam.workspace = true

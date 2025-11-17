@@ -2624,6 +2624,7 @@ dependencies = [
  "glam",
  "wgpu",
  "winit",
+ "world",
 ]
 
 [[package]]
